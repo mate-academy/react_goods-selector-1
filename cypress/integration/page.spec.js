@@ -1,89 +1,170 @@
-const goods = [
-  'Dumplings',
-  'Carrot',
-  'Eggs',
-  'Ice cream',
-  'Apple',
-  'Bread',
-  'Fish',
-  'Honey',
-  'Jam',
-  'Garlic',
-];
-
-const buttons = {
-  clear: 'Clear',
-  remove: 'Remove',
-  select: 'Select'
-};
-
 const page = {
-  getGoodButton(index, buttonSelector) {
-    return cy.contains('li', goods[index])
-      .contains(buttonSelector);
+  title: () => cy.get('h1.title'),
+  clearButton: () => cy.byDataCy('ClearButton'),
+  goods: () => cy.byDataCy('Good'),
+
+  assertGoodSelected: index => {
+    page.goods().eq(index)
+      .should('have.class', 'has-background-success-light');
   },
-  header() {
-    return cy.get('h1');
-  }
+
+  assertSelectedGoodsCount: count => {
+    cy.get('[data-cy="Good"].has-background-success-light')
+      .should('have.length', count);
+  },
 };
+
+let failed = false;
+
+Cypress.on('fail', (e) => {
+  failed = true;
+  throw e;
+});
 
 describe('Page', () => {
   beforeEach(() => {
+    if (failed) Cypress.runner.stop();
+
     cy.visit('/');
   });
 
-  it('should have only original items on the list', () => {
-    cy.get('li')
-      .should('have.length', goods.length);
+  describe('', () => {
+    it('should have a list with one item per a good', () => {
+      page.goods().should('have.length', 10);
+
+      page.goods().eq(0).byDataCy('GoodTitle').should('have.text', 'Dumplings');
+      page.goods().eq(4).byDataCy('GoodTitle').should('have.text', 'Apple');
+      page.goods().eq(8).byDataCy('GoodTitle').should('have.text', 'Jam');
+    });
+
+    it('should have a title with Jam selected by default', () => {
+      page.title().should('have.text', `Jam is selected`);
+    });
+
+    it('should have an "x" button in the title', () => {
+      page.clearButton().should('exist');
+    });
+
+    it('should have only 1 highlighted good', () => {
+      page.assertSelectedGoodsCount(1);
+    });
+
+    it('should have Jam highlighted', () => {
+      page.assertGoodSelected(8);
+    });
+
+    it('should show RemoveButton for a selected good', () => {
+      page.goods().eq(8)
+        .byDataCy('RemoveButton')
+        .should('exist');
+    });
+
+    it('should have only 1 RemoveButton', () => {
+      cy.byDataCy('RemoveButton').should('have.length', 1);
+    });
+
+    it('should have correct style for the RemoveButton', () => {
+      cy.byDataCy('RemoveButton')
+        .should('have.class', 'is-info')
+        .and('have.text', '-');
+    });
+
+    it('should not have AddButton for the selected good', () => {
+      page.goods().eq(8)
+        .byDataCy('AddButton')
+        .should('not.exist');
+    });
+
+    it('should have an AddButton for each not selected goods', () => {
+      cy.byDataCy('AddButton').should('have.length', 9);
+    });
+
+    it('should have correct styles for AddButton', () => {
+      cy.get('[data-cy="AddButton"].is-info').should('not.exist');
+      cy.contains('[data-cy="AddButton"]', '-').should('not.exist');
+      cy.byDataCy('AddButton').eq(0).should('have.text', '+');
+    });
   });
 
-  it('should have selected Jam item by default', () => {
-    page.header()
-      .should('contain', `${goods[8]} is selected`);
+  describe('after selecting another good', () => {
+    beforeEach(() => {
+      page.goods().eq(1).byDataCy('AddButton').click()
+    });
+
+    it('should have title with a new selected good', () => {
+      page.title().should('have.text', 'Carrot is selected');
+    });
+
+    it('should have an "x" button in the title', () => {
+      page.clearButton().should('exist');
+    });
+
+    it('should have new good selected', () => {
+      page.assertGoodSelected(1);
+    });
+
+    it('should have 1 selected good', () => {
+      page.assertSelectedGoodsCount(1);
+    });
+
+    it('should show RemoveButton for a new good', () => {
+      page.goods().eq(1)
+        .byDataCy('RemoveButton')
+        .should('exist');
+    });
+
+    it('should have only 1 RemoveButton', () => {
+      cy.byDataCy('RemoveButton').should('have.length', 1);
+    });
   });
 
-  it('should have a name of item on the each item in the list', () => {
-    cy.get('li')
-      .contains(goods[0])
-      .should('be.visible');
+  describe('after title "x" button click', () => {
+    beforeEach(() => {
+      page.clearButton().click()
+    });
+
+    it('should have title with no selected good', () => {
+      page.title().should('have.text', 'No goods selected');
+    });
+
+    it('should not have "x" button', () => {
+      page.clearButton().should('not.exist');
+    });
+
+    it('should not have selected goods', () => {
+      page.assertSelectedGoodsCount(0);
+    });
+
+    it('should allow to select a good', () => {
+      page.goods().eq(4).byDataCy('AddButton').click()
+
+      page.title().should('have.text', 'Apple is selected');
+      page.assertGoodSelected(4);
+    });
   });
 
-  it('should have a "Remove" button to unselect selected item', () => {
-    page.getGoodButton(8, buttons.remove) 
-      .click();
+  describe('after RemoveButton click', () => {
+    beforeEach(() => {
+      cy.byDataCy('RemoveButton').click();
+    });
 
-    page.header()
-      .should('contain', 'No goods selected');
-  });
+    it('should have title with no selected good', () => {
+      page.title().should('have.text', 'No goods selected');
+    });
 
-  it('should have a "Select" button to select item', () => {
-    page.getGoodButton(8, buttons.remove) 
-      .click();
-    page.getGoodButton(8, buttons.select)
-      .click();
+    it('should not have "x" button', () => {
+      page.clearButton().should('not.exist');
+    });
 
-    page.header()
-      .should('contain', `${goods[8]} is selected`);
-  });
+    it('should not have selected goods', () => {
+      page.assertSelectedGoodsCount(0);
+    });
 
-  it('shouldn\'t have a "Select" button on the selected item', () => {
-    page.getGoodButton(8, buttons.select)
-      .should('not.exist');
-  });
+    it('should allow to select a good', () => {
+      page.goods().eq(5).byDataCy('AddButton').click()
 
-  it('should have "Clear" button to remove selected elements', () => {
-    cy.contains('button', buttons.clear)
-      .click();
-
-    page.header()
-      .should('contain', 'No goods selected');
-  });
-
-  it('should not display "Clear" button if there is no selected good', () => {
-    page.getGoodButton(8, buttons.remove)
-      .click();
-
-    cy.contains('button', buttons.clear)
-      .should('not.exist');
+      page.title().should('have.text', 'Bread is selected');
+      page.assertGoodSelected(5);
+    });
   });
 });
